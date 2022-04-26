@@ -8,6 +8,7 @@ const { NotFoundError } = require('../errors/notFoundError');
 const { transactionGetter } = require('../repositories/transactionGetter');
 
 function JobService(JobRepository, ProfileRepository, TransactionGetter) {
+  // NOTE: not scalable. Redis could be used to lock job payment
   const currentJobPayments = new Set();
   return {
     async getUnpaidJobs(profileId) {
