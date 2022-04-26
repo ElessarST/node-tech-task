@@ -5,8 +5,10 @@ const { profileRepository } = require('../repositories/profileRepository');
 const { PayJobError } = require('../errors/payJobError');
 const { JobPaidError } = require('../errors/jobPaidError');
 const { NotFoundError } = require('../errors/notFoundError');
+const { transactionGetter } = require('../repositories/transactionGetter');
 
-function JobService(JobRepository, ProfileRepository) {
+function JobService(JobRepository, ProfileRepository, TransactionGetter) {
+  const currentJobPayments = new Set();
   return {
     async getUnpaidJobs(profileId) {
       return JobRepository.findUnpaidJobs(profileId);
@@ -29,26 +31,43 @@ function JobService(JobRepository, ProfileRepository) {
       if (!isJobClient) {
         throw new ForbiddenError();
       }
-      if (job.paid) {
+      if (job.paid || currentJobPayments.has(jobId)) {
         throw new JobPaidError();
       }
       const isEnoughBalance = profile.balance > job.price;
       if (!isEnoughBalance) {
         throw new NotEnoughBalanceError();
       }
-      const transferred = await ProfileRepository.transferMoney(
-        ClientId,
-        ContractorId,
-        job.price,
+      const transaction = await TransactionGetter.createTransaction().catch(
+        (e) => {
+          currentJobPayments.delete(jobId);
+          throw e;
+        },
       );
-      if (!transferred) {
+      try {
+        currentJobPayments.add(jobId);
+        await ProfileRepository.transferMoney(
+          ClientId,
+          ContractorId,
+          job.price,
+          transaction,
+        );
+        await JobRepository.setPaid(jobId, transaction);
+        await transaction.commit();
+        currentJobPayments.delete(jobId);
+      } catch (error) {
+        currentJobPayments.delete(jobId);
+        await transaction.rollback();
         throw new PayJobError();
       }
-      await JobRepository.setPaid(jobId);
     },
   };
 }
 
-const jobService = new JobService(jobRepository, profileRepository);
+const jobService = new JobService(
+  jobRepository,
+  profileRepository,
+  transactionGetter,
+);
 
 module.exports = { JobService, jobService };

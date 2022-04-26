@@ -9,30 +9,22 @@ function ProfileRepository() {
     },
     /**
      * Transfer money from on profile to another in transaction
-     * @param fromId    id of profile to transfer from
-     * @param toId      id of profile to transfer to
-     * @param amount    transfer amount
-     * @return {Promise<boolean>} true if transfer was succeeded, false otherwise
+     * @param fromId        id of profile to transfer from
+     * @param toId          id of profile to transfer to
+     * @param amount        transfer amount
+     * @param transaction   transaction to run
      */
-    async transferMoney(fromId, toId, amount) {
-      const transaction = await sequelize.transaction();
-
-      try {
-        await sequelize.models.Profile.increment(
+    async transferMoney(fromId, toId, amount, transaction) {
+      await Promise.all([
+        sequelize.models.Profile.increment(
           { balance: -amount },
           { where: { id: fromId }, transaction },
-        );
-        await sequelize.models.Profile.increment(
+        ),
+        sequelize.models.Profile.increment(
           { balance: amount },
           { where: { id: toId }, transaction },
-        );
-
-        await transaction.commit();
-        return true;
-      } catch (error) {
-        await transaction.rollback();
-        return false;
-      }
+        ),
+      ]);
     },
 
     async depositMoney(profileId, amount) {

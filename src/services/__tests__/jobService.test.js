@@ -10,6 +10,11 @@ function createService(
   jobRepositoryOverrides = {},
   profileRepositoryOverrides = {},
 ) {
+  const transactionMock = {
+    createTransaction: jest
+      .fn()
+      .mockResolvedValue({ commit: jest.fn(), rollback: jest.fn() }),
+  };
   const jobRepositoryMock = {
     findById: jest.fn(),
     setPaid: jest.fn(),
@@ -19,7 +24,11 @@ function createService(
     transferMoney: jest.fn(),
     ...profileRepositoryOverrides,
   };
-  return new JobService(jobRepositoryMock, profileRepositoryMock);
+  return new JobService(
+    jobRepositoryMock,
+    profileRepositoryMock,
+    transactionMock,
+  );
 }
 
 const profileMock = {
@@ -78,7 +87,7 @@ describe('JobService', () => {
     });
     it('should throw error if transfer failed', async () => {
       const findByIdMock = jest.fn().mockResolvedValue(jobMock);
-      const transferMock = jest.fn().mockResolvedValue(false);
+      const transferMock = jest.fn().mockRejectedValueOnce(new Error());
       const service = createService(
         { findById: findByIdMock },
         { transferMoney: transferMock },
@@ -96,7 +105,7 @@ describe('JobService', () => {
         { transferMoney: transferMock },
       );
       await service.pay(profileMock, 1);
-      expect(transferMock).toHaveBeenCalledWith(1, 2, 100);
+      expect(transferMock).toHaveBeenCalledWith(1, 2, 100, expect.any(Object));
       expect(setPaidMock).toHaveBeenCalled();
     });
   });

@@ -29,10 +29,10 @@ function JobRepository() {
         },
       });
     },
-    async setPaid(jobId) {
+    async setPaid(jobId, transaction) {
       return sequelize.models.Job.update(
         { paid: true, paymentDate: new Date() },
-        { where: { id: jobId } },
+        { where: { id: jobId }, transaction },
       );
     },
     async findBestProfessions(startDate, endDate) {
@@ -57,7 +57,7 @@ from Jobs j
          join Contracts c on c.id = j.ContractId
          join Profiles p on p.id = c.ClientId
 where j.paid = true and j.paymentDate > $start and j.paymentDate < $end
-group by p.profession
+group by p.id
 order by paid desc limit $limit;`,
         {
           bind: {
